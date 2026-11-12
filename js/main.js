@@ -47,6 +47,7 @@
       document.body.classList.remove("locked");
       burstPetals(26);
       revealVisible();
+      AutoScroll.start(2800);           // gentle tour of the page after the first screen settles
     }, reduceMotion ? 50 : 1700);
   });
 
@@ -397,12 +398,13 @@
       entries.forEach((e) => {
         if (e.isIntersecting) { e.target.classList.add("is-in"); io.unobserve(e.target); }
       });
-    }, { threshold: 0.15, rootMargin: "0px 0px -40px 0px" });
+    }, { threshold: 0, rootMargin: "0px 0px -20px 0px" });
   }
-   function revealVisible() {
+  function revealVisible() {
     let n = 0;
     reveals.forEach((el) => {
-      // First screen animates in right away; the rest animates on scroll.
+      // Everything in the first screen (title, names, "Scroll" cue…) animates in right away,
+      // one after another — no scrolling needed. The rest animates as it scrolls into view.
       const onFirstScreen = el.closest(".hero") || el.getBoundingClientRect().top < window.innerHeight;
       if (onFirstScreen || !io) {
         el.style.transitionDelay = (n++ * 0.12) + "s";
@@ -412,6 +414,50 @@
       }
     });
   }
+
+  /* ---------------- Auto scroll ----------------
+     After the envelope opens, the page glides slowly to the end once.
+     Any touch, swipe, mouse wheel, click or key press hands control back
+     to the guest immediately.                                            */
+  const AutoScroll = (() => {
+    const SPEED = window.innerWidth < 700 ? 55 : 70;   // pixels per second
+    let raf = 0, active = false, cancelled = false, pos = 0, last = 0;
+    const html = document.documentElement;
+
+    function stop() {
+      cancelled = true;              // also cancels a tour that hasn't started yet
+      active = false;
+      cancelAnimationFrame(raf);
+      html.style.scrollBehavior = "";
+      ["touchstart", "wheel", "mousedown", "keydown"].forEach((ev) => window.removeEventListener(ev, stop));
+    }
+
+    function step(now) {
+      if (!active) return;
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      const max = html.scrollHeight - window.innerHeight;
+      // ease in over the first ~150px so it doesn't jolt
+      const ramp = Math.min(1, 0.25 + pos / 200);
+      pos = Math.min(max, pos + SPEED * ramp * dt);
+      window.scrollTo(0, pos);
+      if (pos >= max - 1) return stop();
+      raf = requestAnimationFrame(step);
+    }
+
+    function start(delay) {
+      if (reduceMotion) return;
+      ["touchstart", "wheel", "mousedown", "keydown"].forEach((ev) => window.addEventListener(ev, stop, { passive: true }));
+      setTimeout(() => {
+        if (cancelled || document.body.classList.contains("locked")) return;
+        active = true;
+        html.style.scrollBehavior = "auto";     // per-frame scrolling must not be smoothed
+        pos = window.scrollY; last = performance.now();
+        raf = requestAnimationFrame(step);
+      }, delay);
+    }
+
+    return { start, stop };
+  })();
 
   /* ---------------- Countdown ---------------- */
   const cd = { d: $("#cd-days"), h: $("#cd-hours"), m: $("#cd-mins"), s: $("#cd-secs") };
