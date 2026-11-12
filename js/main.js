@@ -399,10 +399,17 @@
       });
     }, { threshold: 0.15, rootMargin: "0px 0px -40px 0px" });
   }
-  function revealVisible() {
-    reveals.forEach((el, i) => {
-      if (io) { el.style.transitionDelay = (el.closest(".hero") ? i * 0.12 : 0) + "s"; io.observe(el); }
-      else el.classList.add("is-in");
+   function revealVisible() {
+    let n = 0;
+    reveals.forEach((el) => {
+      // First screen animates in right away; the rest animates on scroll.
+      const onFirstScreen = el.closest(".hero") || el.getBoundingClientRect().top < window.innerHeight;
+      if (onFirstScreen || !io) {
+        el.style.transitionDelay = (n++ * 0.12) + "s";
+        requestAnimationFrame(() => el.classList.add("is-in"));
+      } else {
+        io.observe(el);
+      }
     });
   }
 
